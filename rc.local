@@ -21,7 +21,7 @@ fi
 sudo iwconfig wlan0 txpower off
 
 # Disable ethernet
-ip link set eth0 down
+sudo ip link set eth0 down
 
 # Watch for mounted devices
 cd /media/
@@ -29,26 +29,28 @@ cd /media/
 for i in `seq 1 100`;
 do
 	# Search for *.apk
-	APK="$(find $PWD -type f -name "*.apk" | head -n 1)"
+	APK="$(find $PWD -type f -name "*.apk" -not -path "*/\.*" | head -n 1)"
 
 	# Search for *.keystore
 	KEYSTORE="$(find $PWD -type f -name "*.keystore" | head -n 1)"
+	KEYPASS="$(find $PWD -type f -name "key-pass.txt" | head -n 1)"
+	KSPASS="$(find $PWD -type f -name "ks-pass.txt" | head -n 1)"
+	ALIAS="$(find $PWD -type f -name "alias.txt" | head -n 1)"
 
-	# Search for pw.txt containing the keystore password
-	BASE=$(dirname $APK)
-	KEYPASS="$BASE/key-pass.txt"
-	KSPASS="$BASE/ks-pass.txt"
-	ALIAS="$BASE/alias.txt"
-	
 	if [ -z "$APK" ] || [ -z "$KEYSTORE" ] || [ -z "$KEYPASS" ] || [ -z "$KSPASS" ] || [ -z "$ALIAS" ]; then
 		echo "One of the following is missing: *.apk, *.keystore, key-pass.txt, ks-pass.txt or alias.txt $i/100"
 	else
-		echo "Everything found, start signing..."
-		OUTFILE="$BASE/android-release.apk"
-		/home/pi/android-sdk-linux/build-tools/28.0.0/apksigner sign --key-pass pass:$(cat "$KEYPASS") --ks-pass pass:$(cat "$KSPASS") --ks $KEYSTORE --ks-key-alias $(cat "$ALIAS") --out $OUTFILE $APK
-		
-		echo "Created file:"
-		echo $OUTFILE
+		APKS=$(find $PWD -type f -name "*.apk" -not -path "*/\.*")
+		for i in $APKS ; do
+			echo "Everything found, start signing..."
+			BASE="$(dirname $i)"
+			FILENAME="$(basename $i)"
+			FILENAME_NO_EXTENSION="${FILENAME%.*}"
+			OUTFILE="$BASE/$FILENAME_NO_EXTENSION-signed.apk"
+			/home/pi/android-sdk-linux/build-tools/28.0.0/apksigner sign --key-pass pass:$(cat "$KEYPASS") --ks-pass pass:$(cat "$KSPASS") --ks $KEYSTORE --ks-key-alias $(cat "$ALIAS") --out $OUTFILE $i
+			echo "Created file:"
+			echo $OUTFILE
+		done
 
 		echo "Shutdown..."
 		sudo shutdown -h now
